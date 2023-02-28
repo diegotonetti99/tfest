@@ -9,14 +9,30 @@ from scipy.optimize import minimize
 from scipy import signal
 
 class tfest:
-    def __init__(self, u, y):
-        self.u = u
-        self.y = y
+    def __init__(self):
+        self.u = None
+        self.y = None
         self.res = None
         self.frequency = None
         self.H = None
         self.npoles = 0
         self.nzeros = 0
+
+    def set_time_response(self, u, y):
+        """
+            u: array of input time response
+            y: array of output time respose
+        """
+        self.u = u
+        self.y = y
+
+    def set_frequency_response(self, H, frequency):
+        """
+            H: array of frequency response Y/U
+            frequency: array of frequencies where H is evaluated
+        """
+        self.H = H
+        self.frequency = frequency
 
     def loss(self, x, nzeros, freq, H, l1=0):
         """
@@ -70,13 +86,13 @@ class tfest:
         self.H = H
         return self.H, frequency
 
-    def estimate(self, nzeros, npoles, init_value=1, options={'xatol': 1e-3, 'disp': True}, method="h1", time=None, l1=0):
+    def estimate(self, nzeros, npoles, init_value=1, options={'xatol': 1e-3, 'disp': True}, method="H", time=None, l1=0):
         """
         npoles: number of poles
         nzeros: number of zeros
         init_value: mean for distribution of initial values
         options: options for scipy.optimize.minimize
-        method: "fft" or "density"
+        method: "fft" or "density" or "from H"
         time: time for fft
         l1: L2 regularization
 
@@ -88,7 +104,14 @@ class tfest:
         self.nzeros = nzeros
 
         x0 = np.random.normal(init_value, 1, nzeros+npoles)
-        H, frequency = self.transfer_function_H(method=method, time=time)
+        if method == "H":
+            assert self.H is not None
+            H = self.H
+            frequency = self.frequency
+        else:
+            assert self.u is not None
+            assert self.y is not None
+            H, frequency = self.transfer_function_H(method=method, time=time)
         pass_to_loss = lambda x: self.loss(x, nzeros, frequency, H, l1)
         self.res = minimize(pass_to_loss, x0, method='nelder-mead', options=options)
         return self.res
